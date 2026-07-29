@@ -1,0 +1,135 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   // "patient" | "guardian"
+  phone     String?
+  createdAt DateTime @default(now())
+
+  patientProfile PatientProfile?
+  guardianLinks  GuardianPatientLink[] @relation("Guardian")
+
+  @@map("users")
+}
+
+model PatientProfile {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName      String
+  preferredName String
+  dateOfBirth   String?
+  photoUrl      String?
+  diagnosis     String?
+  language      String   @default("en")
+  createdAt     DateTime @default(now())
+
+  guardianLinks GuardianPatientLink[]
+  tasks         Task[]
+  diaryEntries  DiaryEntry[]
+  people        Person[]
+  lostEvents    LostEvent[]
+
+  @@map("patient_profiles")
+}
+
+model GuardianPatientLink {
+  id                String         @id @default(cuid())
+  guardianId        String
+  guardian          User           @relation("Guardian", fields: [guardianId], references: [id], onDelete: Cascade)
+  patientId         String
+  patient           PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  relationshipLabel String
+  isPrimary         Boolean        @default(false)
+  createdAt         DateTime       @default(now())
+
+  @@map("guardian_patient_links")
+}
+
+model Task {
+  id            String         @id @default(cuid())
+  patientId     String
+  patient       PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  scheduledTime String         // "HH:MM" format
+  recurrence    String         @default("once") // "once" | "daily" | "weekly"
+  category      String         @default("other") // "medicine" | "family" | "appointment" | "exercise" | "meal" | "other"
+  difficulty    String         @default("easy") // "easy" | "medium" | "hard"
+  isCompleted   Boolean        @default(false)
+  completedAt   DateTime?
+  createdAt     DateTime       @default(now())
+
+  logs TaskLog[]
+
+  @@map("tasks")
+}
+
+model TaskLog {
+  id       String   @id @default(cuid())
+  taskId   String
+  task     Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  status   String   // "done" | "missed" | "snoozed"
+  loggedAt DateTime @default(now())
+
+  @@map("task_logs")
+}
+
+model Person {
+  id                String         @id @default(cuid())
+  patientId         String
+  patient           PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  name              String
+  nickname          String?
+  relationshipLabel String
+  phone             String?
+  address           String?
+  photoUrl          String?
+  keyFacts          String         @default("[]") // JSON array of strings
+  voiceNoteUrl      String?
+  createdAt         DateTime       @default(now())
+
+  @@map("people")
+}
+
+model DiaryEntry {
+  id              String         @id @default(cuid())
+  patientId       String
+  patient         PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  rawText         String
+  audioUrl        String?
+  moodLabel       String?        // "happy" | "anxious" | "confused" | "calm" | "sad"
+  peopleMentioned String         @default("[]") // JSON array
+  placesMentioned String         @default("[]") // JSON array
+  embedding       String?        // JSON float array for cosine search
+  createdAt       DateTime       @default(now())
+
+  @@map("diary_entries")
+}
+
+model LostEvent {
+  id                String         @id @default(cuid())
+  patientId         String
+  patient           PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  triggeredAt       DateTime       @default(now())
+  latitude          Float?
+  longitude         Float?
+  address           String?
+  notifiedGuardians String         @default("[]") // JSON array of guardian emails
+  resolvedAt        DateTime?
+  resolvedBy        String?
+
+  @@map("lost_events")
+}
